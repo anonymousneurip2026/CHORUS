@@ -67,12 +67,12 @@ let currentCohort = 'TCGA-NSCLC';
 let currentSubclass = 'LUAD';
 
 function setCohort(cohort) {
-    console.log("Setting cohort:", cohort);
+    console.log("[TextExplorer] Setting cohort:", cohort);
     currentCohort = cohort;
-    currentSubclass = interpretabilityData[cohort][0]; // Default to first subclass
+    currentSubclass = interpretabilityData[cohort][0];
 
-    // Update Cohort Buttons
-    document.querySelectorAll('.cohort-btn').forEach(btn => {
+    // Update Text Cohort Buttons specifically
+    document.querySelectorAll('.interpret-section .cohort-btn').forEach(btn => {
         btn.classList.toggle('active', btn.innerText === cohort);
     });
 
@@ -140,8 +140,8 @@ function initTextExplorer() {
             currentCohort = cohorts[0];
             currentSubclass = interpretabilityData[currentCohort][0];
             
-            // Update Cohort Buttons
-            document.querySelectorAll('.cohort-btn').forEach(btn => {
+            // Update Text Cohort Buttons specifically
+            document.querySelectorAll('.interpret-section .cohort-btn').forEach(btn => {
                 btn.classList.toggle('active', btn.innerText === currentCohort);
             });
 
@@ -149,7 +149,7 @@ function initTextExplorer() {
             updateInterpretImage();
         }
     } else {
-        console.error("Manifest variable 'textInterpretabilityManifest' not found.");
+        console.error("[TextExplorer] Manifest variable 'textInterpretabilityManifest' not found.");
     }
 }
 
@@ -173,11 +173,13 @@ function initVisualExplorer() {
             currentVisualCohort = cohorts[0];
             currentVisualSlide = visualHeatmapData[currentVisualCohort][0];
             
+            console.log("[VisualExplorer] Initializing with cohort:", currentVisualCohort, "and slide:", currentVisualSlide);
+            
             populateSlideSelect();
             updateHeatmapImage();
         }
     } else {
-        console.error("Manifest variable 'visualHeatmapDataManifest' not found. Ensure visual_heatmap_manifest.js is included.");
+        console.error("[VisualExplorer] Manifest variable 'visualHeatmapDataManifest' not found.");
     }
 }
 
@@ -230,19 +232,23 @@ function updateHeatmapImage() {
     if (!img) return;
 
     const newSrc = `Visual_Heatmaps/${currentVisualCohort}/${currentVisualSlide}/${currentVisualVariation}/uncertainty.png`;
+    console.log("[VisualExplorer] Loading image:", newSrc);
 
     img.classList.remove('visible');
 
+    // Set onload handler BEFORE setting src to catch cached images
+    img.onload = () => {
+        img.classList.add('visible');
+    };
+    
+    img.onerror = () => {
+        console.error("[VisualExplorer] Failed to load image at:", newSrc);
+        img.src = 'https://via.placeholder.com/900x600?text=Heatmap+Not+Available';
+        img.classList.add('visible');
+    };
+
     setTimeout(() => {
         img.src = newSrc;
-        img.onload = () => {
-            img.classList.add('visible');
-        };
-        img.onerror = () => {
-            console.error("Heatmap not found:", newSrc);
-            img.src = 'https://via.placeholder.com/900x600?text=Heatmap+Not+Available';
-            img.classList.add('visible');
-        };
     }, 200);
 }
 
