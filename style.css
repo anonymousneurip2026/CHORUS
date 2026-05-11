@@ -1000,7 +1000,7 @@ footer {
     font-family: 'JetBrains Mono', monospace;
     font-size: 13px;
     font-weight: 600;
-    color: var(--primary);
+    color: var(--dark);
 }
 
 .progress-dots {
@@ -1018,14 +1018,14 @@ footer {
 }
 
 .progress-dot.done {
-    background: var(--primary);
+    background: var(--dark);
     opacity: 0.4;
 }
 
 .progress-dot.active {
-    background: var(--primary);
+    background: var(--dark);
     transform: scale(1.5);
-    box-shadow: 0 0 12px rgba(59, 130, 246, 0.4);
+    box-shadow: 0 0 12px rgba(15, 23, 42, 0.3);
 }
 
 .gcca-card {
@@ -1045,7 +1045,7 @@ footer {
 }
 
 .gcca-card.active {
-    border-color: var(--primary);
+    border-color: var(--dark);
     border-width: 2px;
     box-shadow: var(--shadow-lg);
     transform: scale(1.02);
@@ -1066,7 +1066,7 @@ footer {
 }
 
 .gcca-card.active .card-step {
-    color: var(--primary);
+    color: var(--dark);
 }
 
 .card-title {
@@ -1131,27 +1131,37 @@ footer {
     color: var(--dark);
 }
 
-.gcca-nav {
+.gcca-progress {
     position: sticky;
-    bottom: 0;
-    padding: 2rem 0 4rem;
+    top: 100px;
     z-index: 100;
-    display: flex;
-    justify-content: center;
-    gap: 1rem;
 }
 
-.gcca-nav::before {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: -100vw;
-    right: -100vw;
-    height: 150px;
-    background: linear-gradient(to top, var(--bg-light) 60%, transparent);
-    z-index: -1;
-    pointer-events: none;
+.gcca-btn-sm {
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    border: 1px solid #e2e8f0;
+    border-radius: 9999px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg-white);
+    color: var(--dark);
 }
+
+.gcca-btn-sm:hover:not(:disabled) {
+    border-color: var(--dark);
+    color: var(--dark);
+    background: #f8fafc;
+}
+
+.gcca-btn-sm:disabled {
+    opacity: 0.2;
+    cursor: not-allowed;
+}
+
 
 .gcca-btn {
     font-family: 'Inter', sans-serif;
