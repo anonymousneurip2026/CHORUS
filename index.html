@@ -10,8 +10,21 @@
     <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- MathJax for LaTeX rendering -->
-    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
-    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true,
+                packages: {'[+]': ['ams', 'boldsymbol']}
+            },
+            svg: {
+                fontCache: 'global'
+            },
+            loader: {load: ['[tex]/ams', '[tex]/boldsymbol']}
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
 </head>
 
 <body>
@@ -26,6 +39,7 @@
                 <a href="#docker">Docker</a>
                 <a href="#model-weights">Model Weights</a>
                 <a href="#walkthrough">Key Components</a>
+                <a href="#gcca-algorithm">GCCA Algorithm</a>
             </div>
         </div>
     </nav>
@@ -59,6 +73,7 @@
                 Interpretability</a>
             <a href="#model-weights" class="btn btn-secondary"><img src="hf-logo.svg" alt="Hugging Face" style="height: 1.6rem; width: auto; margin-right: 0.5rem;"> Model Weights</a>
             <a href="#docker" class="btn btn-secondary"><i class="fab fa-docker"></i> Docker</a>
+            <a href="#gcca-algorithm" class="btn btn-secondary"><i class="fas fa-code"></i> GCCA Algorithm</a>
         </div>
     </header>
 
@@ -69,11 +84,11 @@
                 <img src="concept.png" alt="CHORUS Concept" style="max-width: 100%; height: auto; mix-blend-mode: multiply;">
             </div>
             <div class="math-detail" style="margin-top: 0; padding-top: 0; border-top: none;">
-                <p style="font-size: 1rem; color: var(--text-main); line-height: 1.8; text-align: justify;">
-                    <strong>Overview of the CHORUS framework.</strong>
-                    <strong>(1) Calibration phase.</strong> Patches are randomly sampled from a calibration set of WSIs and encoded by \(K_v\) pathology foundation models, each producing features in its own native dimensionality. Generalized Canonical Correlation Analysis (GCCA) fits projection matrices \(\{\mathbf{W}_k\}\) that map all encoders into a unified \(D\)-dimensional representation space.
-                    <strong>(2) Global agreement signal.</strong> In the unified space, each feature dimension is characterized by how strongly the projected encoder views correlate. The agreement spectrum \(\boldsymbol{\rho} \in [0,1]^D\) separates dimensions where encoders <em>Do Agree</em> (encoder-invariant tissue structure) from dimensions where they <em>Do Not Agree</em> (encoder-specific variation).
-                    <strong>(3) Local uncertainty signal.</strong> At inference time, each patch is projected by all encoders and the cross-encoder variance is computed. Patches with high variance (red Gaussian) indicate encoder disagreement and are treated as locally uncertain; patches with low variance (green Gaussian) indicate consensus and are treated as informative. CHORUS uses \(\boldsymbol{\rho}\) and \(\boldsymbol{\sigma}^2(x)\) jointly to guide prompt-based MIL aggregation.
+                <p style="font-size: 1.05rem; color: var(--text-main); line-height: 1.7; text-align: left; margin: 0 auto; max-width: 1000px;">
+                    <span style="display: block; margin-bottom: 1rem; font-size: 1.1rem;"><strong>Overview of the CHORUS framework.</strong></span>
+                    <span style="display: block; margin-bottom: 0.75rem;"><strong>(1) Calibration phase.</strong> Patches are randomly sampled from a calibration set of WSIs and encoded by \(K_v\) pathology foundation models, each producing features in its own native dimensionality. Generalized Canonical Correlation Analysis (GCCA) fits projection matrices \(\{\mathbf{W}_k\}\) that map all encoders into a unified \(D\)-dimensional representation space.</span>
+                    <span style="display: block; margin-bottom: 0.75rem;"><strong>(2) Global agreement signal.</strong> In the unified space, each feature dimension is characterized by how strongly the projected encoder views correlate. The agreement spectrum \(\boldsymbol{\rho} \in [0,1]^D\) separates dimensions where encoders <em>Do Agree</em> (encoder-invariant tissue structure) from dimensions where they <em>Do Not Agree</em> (encoder-specific variation).</span>
+                    <span style="display: block; margin-bottom: 0.75rem;"><strong>(3) Local uncertainty signal.</strong> At inference time, each patch is projected by all encoders and the cross-encoder variance is computed. Patches with high variance (red Gaussian) indicate encoder disagreement and are treated as locally uncertain; patches with low variance (green Gaussian) indicate consensus and are treated as informative. CHORUS uses \(\boldsymbol{\rho}\) and \(\boldsymbol{\sigma}^2(x)\) jointly to guide prompt-based MIL aggregation.</span>
                 </p>
             </div>
         </div>
@@ -738,6 +753,120 @@ rho_v = self._get_rho_v()</pre>
     </section>
 
 
+
+    <!-- GCCA Algorithm Section -->
+    <section id="gcca-algorithm" class="animate-up" style="padding: 6rem 2rem; background: var(--bg-light); border-top: 1px solid #eee;">
+        <div style="max-width: 800px; margin: 0 auto; margin-bottom: 4rem;">
+            <h2 class="section-title" style="text-align: left; margin-bottom: 1.5rem;">GCCA Algorithmic Walkthrough</h2>
+            <p style="color: var(--text-muted); font-size: 1.15rem; max-width: 700px; line-height: 1.7;">
+                Step through the regularized MAXVAR-GCCA procedure that aligns heterogeneous pathology foundation models into a shared latent space.
+            </p>
+        </div>
+
+        <div class="gcca-progress" style="max-width: 800px; margin: 0 auto 12px; display: flex; align-items: center; justify-content: space-between;">
+            <span class="progress-text" id="stepLabel" style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-muted);">Step 1 / 9</span>
+            <div class="progress-dots" id="dots" style="display: flex; gap: 6px;"></div>
+        </div>
+
+
+
+        <div class="gcca-cards" id="gcca-cards-container" style="max-width: 800px; margin: 0 auto; padding: 16px 0 32px; display: flex; flex-direction: column; gap: 20px;">
+            <!-- 1 -->
+            <div class="gcca-card active">
+                <div class="card-step">Step 1 — Setup</div>
+                <div class="card-title">Multi-Encoder Feature Extraction</div>
+                <div class="card-desc">Three frozen foundation models encode every patch independently, each producing features in its own native dimensionality \(d_k\).</div>
+                <div class="card-eq">\[\mathbf{Z}_{s,k} \in \mathbb{R}^{N_s \times d_k}, \quad k \in \{1,2,3\}\]</div>
+                <table class="dim-table">
+                    <thead><tr><th>Encoder</th><th>Dim \(d_k\)</th></tr></thead>
+                    <tbody>
+                        <tr><td>UNI</td><td>1024</td></tr>
+                        <tr><td>GigaPath</td><td>1536</td></tr>
+                        <tr><td>ResNet-50</td><td>1024</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 2 -->
+            <div class="gcca-card locked">
+                <div class="card-step">Step 2 — Centering</div>
+                <div class="card-title">Center Each View</div>
+                <div class="card-desc">Compute the empirical mean of each encoder on a calibration set of ~140K patches and subtract it.</div>
+                <div class="card-eq">\[\bar{\mathbf{Z}}_k = \mathbf{Z}_k - \mathbf{1}\boldsymbol{\mu}_k^\top\]</div>
+                <div class="card-note">The means \(\boldsymbol{\mu}_k\) are saved and reused at inference.</div>
+            </div>
+
+            <!-- 3 -->
+            <div class="gcca-card locked">
+                <div class="card-step">Step 3 — Covariance</div>
+                <div class="card-title">Regularized Covariance</div>
+                <div class="card-desc">Estimate within-view covariance with a ridge term for numerical stability.</div>
+                <div class="card-eq">\[\tilde{\boldsymbol{\Sigma}}_{kk} = \tfrac{1}{N}\bar{\mathbf{Z}}_k^\top \bar{\mathbf{Z}}_k + \lambda\mathbf{I}, \quad \lambda{=}10^{-3}\]</div>
+            </div>
+
+            <!-- 4 -->
+            <div class="gcca-card locked">
+                <div class="card-step">Step 4 — Whitening</div>
+                <div class="card-title">Inverse Square Root</div>
+                <div class="card-desc">Transform each view to have identity covariance via eigendecomposition.</div>
+                <div class="card-eq">\[\tilde{\mathbf{Z}}_k = \bar{\mathbf{Z}}_k\;\tilde{\boldsymbol{\Sigma}}_{kk}^{-1/2}\]</div>
+                <div class="card-note">After whitening each encoder's features are decorrelated and unit-variance.</div>
+            </div>
+
+            <!-- 5 -->
+            <div class="gcca-card locked">
+                <div class="card-step">Step 5 — Concatenation</div>
+                <div class="card-title">Stack Whitened Views</div>
+                <div class="card-desc">Concatenate all whitened matrices into one wide matrix.</div>
+                <div class="card-eq">\[\mathbf{M} = [\,\tilde{\mathbf{Z}}_1 \mid \tilde{\mathbf{Z}}_2 \mid \tilde{\mathbf{Z}}_3\,] \in \mathbb{R}^{N \times 3584}\]</div>
+            </div>
+
+            <!-- 6 -->
+            <div class="gcca-card locked">
+                <div class="card-step">Step 6 — SVD</div>
+                <div class="card-title">Truncated SVD</div>
+                <div class="card-desc">Extract the top \(D{=}512\) right singular vectors — the directions of maximum consensus variance.</div>
+                <div class="card-eq">\[\mathbf{M} = \mathbf{U}\boldsymbol{\Sigma}\mathbf{V}^\top\]</div>
+            </div>
+
+            <!-- 7 -->
+            <div class="gcca-card locked">
+                <div class="card-step">Step 7 — Recovery</div>
+                <div class="card-title">Per-Encoder Projections</div>
+                <div class="card-desc">Partition \(\mathbf{V}\) and undo whitening to recover frozen projection matrices.</div>
+                <div class="card-eq">\[\mathbf{W}_k = \tilde{\boldsymbol{\Sigma}}_{kk}^{-1/2}\mathbf{V}_k \in \mathbb{R}^{d_k \times 512}\]</div>
+            </div>
+
+            <!-- 8 -->
+            <div class="gcca-card locked">
+                <div class="card-step">Step 8 — Global Signal</div>
+                <div class="card-title">Agreement Spectrum \(\boldsymbol{\rho}\)</div>
+                <div class="card-desc">Measure per-dimension correlation across encoders. Image-independent.</div>
+                <div class="card-eq">\[\rho_j = \tfrac{1}{3}\sum_{i \lt k}\mathrm{corr}(\mathbf{H}_{i,j}, \mathbf{H}_{k,j})\]</div>
+                <div class="card-note">\(\boldsymbol{\rho}\in[0,1]^{512}\) — same for all slides.</div>
+            </div>
+
+            <!-- 9 -->
+            <div class="gcca-card locked">
+                <div class="card-step">Step 9 — Local Signal</div>
+                <div class="card-title">Per-Patch Uncertainty \(\boldsymbol{\sigma}^2\)</div>
+                <div class="card-desc">At inference, compute cross-encoder variance per patch. Image-dependent.</div>
+                <div class="card-eq">\[\sigma^2(x) = \tfrac{1}{3}\sum_k (\mathbf{h}_k(x) - \boldsymbol{\mu}(x))^2\]</div>
+                <div class="card-note">\(\boldsymbol{\sigma}^2 \in \mathbb{R}^{N_s \times 512}\) — different for every slide.</div>
+            </div>
+        </div>
+
+        <div class="gcca-nav">
+            <button class="gcca-btn btn-prev" id="gccaPrevBtn" disabled onclick="goGCCA(-1)">
+                <svg viewBox="0 0 24 24" style="width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;"><polyline points="15 18 9 12 15 6"/></svg>
+                Back
+            </button>
+            <button class="gcca-btn btn-next" id="gccaNextBtn" onclick="goGCCA(1)">
+                Next
+                <svg viewBox="0 0 24 24" style="width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+        </div>
+    </section>
 
     <footer>
         <p>&copy; 2026 CHORUS</p>

@@ -263,4 +263,80 @@ document.addEventListener('DOMContentLoaded', () => {
     if (document.getElementById('slide-select')) {
         initVisualExplorer();
     }
+
+    // GCCA Algorithm Init
+    if (document.getElementById('dots')) {
+        initGCCA();
+    }
 });
+
+/* GCCA Interactive Walkthrough Logic */
+function initGCCA() {
+    const gccaCards = [...document.querySelectorAll('.gcca-card')];
+    const dotsEl = document.getElementById('dots');
+    const stepLabel = document.getElementById('stepLabel');
+    const prevBtn = document.getElementById('gccaPrevBtn');
+    const nextBtn = document.getElementById('gccaNextBtn');
+    
+    if (!gccaCards.length || !dotsEl) return;
+
+    let curGCCA = 0;
+    const numSteps = gccaCards.length;
+
+    // Build dots
+    gccaCards.forEach((_, i) => {
+        const d = document.createElement('div');
+        d.className = 'progress-dot' + (i === 0 ? ' active' : '');
+        d.onclick = () => { 
+            if (i <= curGCCA + 1 || i < curGCCA) { 
+                curGCCA = i; 
+                renderGCCA(); 
+            } 
+        };
+        dotsEl.appendChild(d);
+    });
+    
+    const dots = [...dotsEl.children];
+
+    function renderGCCA() {
+        gccaCards.forEach((c, i) => {
+            c.className = 'gcca-card ' + (i < curGCCA ? 'done' : i === curGCCA ? 'active' : 'locked');
+        });
+        
+        dots.forEach((d, i) => {
+            d.className = 'progress-dot' + (i < curGCCA ? ' done' : i === curGCCA ? ' active' : '');
+        });
+
+        stepLabel.textContent = `Step ${curGCCA + 1} / ${numSteps}`;
+        prevBtn.disabled = curGCCA === 0;
+
+        if (curGCCA === numSteps - 1) {
+            nextBtn.innerHTML = 'Done <svg viewBox="0 0 24 24" style="width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;"><polyline points="20 6 9 17 4 12"/></svg>';
+            nextBtn.disabled = true;
+        } else {
+            nextBtn.innerHTML = 'Next <svg viewBox="0 0 24 24" style="width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;"><polyline points="9 18 15 12 9 6"/></svg>';
+            nextBtn.disabled = false;
+        }
+
+        // Auto-scroll to the active card
+        gccaCards[curGCCA].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        
+        // Re-render MathJax for the active card
+        if (window.MathJax && MathJax.typesetPromise) {
+            MathJax.typesetPromise([gccaCards[curGCCA]]).catch(() => {});
+        }
+    }
+
+    window.goGCCA = (d) => {
+        const n = curGCCA + d;
+        if (n >= 0 && n < numSteps) { 
+            curGCCA = n; 
+            renderGCCA(); 
+        }
+    };
+
+    renderGCCA();
+}
+
+
+
