@@ -710,6 +710,7 @@ footer {
     object-fit: cover; /* Cover the container */
     object-position: top; /* Keep the top of the image (the content) visible */
     opacity: 0;
+    mix-blend-mode: multiply;
     transition: opacity 0.3s ease-in-out;
 }
 
@@ -782,7 +783,7 @@ footer {
 /* Visual Heatmap Explorer */
 .visual-section {
     padding: 6rem 2rem;
-    background: #fff;
+    background: var(--bg-light);
     border-top: 1px solid #eee;
 }
 
@@ -857,7 +858,7 @@ footer {
     border-radius: 16px;
     overflow: hidden;
     border: 1px solid #e2e8f0;
-    background: #fff;
+    background: transparent;
     line-height: 0;
 }
 
@@ -865,6 +866,7 @@ footer {
     width: 100%;
     height: auto;
     opacity: 0;
+    mix-blend-mode: multiply;
     transition: opacity 0.4s ease-in-out;
 }
 
