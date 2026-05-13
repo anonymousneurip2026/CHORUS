@@ -340,3 +340,160 @@ function initGCCA() {
 
 
 
+// ============================
+// CHORUS Variants Explorer
+// ============================
+const variantDB = {
+    output: {
+        title: 'Modulated Embedding  \\(\\tilde{\\boldsymbol{\\mu}}\\)',
+        text: 'The uncertainty-modulated patch representation fed into the downstream FOCUS pipeline. Same shape as the fused mean: one vector per patch.',
+        dims: '(N_s × 512) per slide',
+        hl: 'a'
+    },
+    mu: {
+        title: 'Fused Mean  \\(\\boldsymbol{\\mu}\\)',
+        text: 'Cross-encoder average of the three projected representations. Each patch gets a single consensus vector combining what UNI, GigaPath, and ResNet-50 see.',
+        dims: '(N_s × 512) image-dependent',
+        hl: 'b'
+    },
+    rho: {
+        title: 'Agreement Spectrum  \\(\\boldsymbol{\\rho}\\)',
+        text: 'Measures how strongly all three encoders correlate on each latent dimension. High ρ_j means the dimension captures encoder-invariant tissue structure. Low ρ_j means encoder-specific noise.',
+        dims: '(512,) image-independent, frozen',
+        hl: 'c'
+    },
+    indicator: {
+        title: 'Threshold Mask  \\(\\mathbb{1}[\\boldsymbol{\\rho} > \\tau]\\)',
+        text: 'Binary mask keeping dimensions where agreement exceeds τ = 0.3 and zeroing out the rest. Invariant to small perturbations in ρ: a clean subspace selection.',
+        dims: '(512,) binary {0, 1}',
+        hl: 'd'
+    },
+    score: {
+        title: 'Modified Selection Score',
+        text: 'Final per-patch relevance score for FOCUS Stage 2 (token selection). Patches with high scores are kept; low-score patches are pruned from aggregation.',
+        dims: 'scalar per patch',
+        hl: 'a'
+    },
+    base_score: {
+        title: 'Text–Patch Similarity  \\(\\mathbf{x}^\\top\\mathbf{T}\\)',
+        text: 'Original FOCUS relevance: dot product between a patch feature and the text embedding matrix from class prompts. Measures how well a patch matches each cancer subtype description.',
+        dims: 'x ∈ ℝ⁵¹², T ∈ ℝ⁵¹²ˣᶜ',
+        hl: 'b'
+    },
+    beta: {
+        title: 'Learnable Scale  \\(\\beta\\)',
+        text: 'Learnable scalar (init 1.0) controlling how strongly the σ² penalty affects selection. The model learns end-to-end how much to trust the uncertainty signal.',
+        dims: 'scalar: 1 of 2 new params in CHORUS',
+        hl: 'c'
+    },
+    sigma_sum: {
+        title: 'Total Patch Uncertainty  \\(\\sum_j \\sigma^2_j(x)\\)',
+        text: 'Sum of per-dimension cross-encoder variance for patch x. Summing across dimensions makes this basis-invariant: preserved under any orthogonal rotation of the feature space.',
+        dims: 'scalar per patch (from N_s × 512)',
+        hl: 'd'
+    },
+    denom: {
+        title: 'Precision Denominator  \\(1 + \\alpha\\sigma^2(x)\\)',
+        text: 'When σ²(x) is low (encoders agree on this patch), the denominator stays near 1 and the global ρ weight passes through. When σ²(x) is high, it attenuates the feature: even if the dimension is globally reliable. Both signals must concur.',
+        dims: '(N_s × 512): α learnable, init 1.0',
+        hl: 'd'
+    },
+    inv_rho: {
+        title: 'Inverted Agreement  \\((1 - \\boldsymbol{\\rho})\\)',
+        text: 'Flips the signal: high-agreement dimensions are downweighted, low-agreement dimensions amplified.',
+        dims: '(512,) same shape as ρ, inverted',
+        hl: 'd'
+    },
+    attn_out: {
+        title: 'Attention Output',
+        text: 'Result of the ρ-modulated cross-modal attention in FOCUS Stage 4. Text-prompt queries attend to patch features, weighted by the agreement-adjusted similarity.',
+        dims: '(n_prompts × 512)',
+        hl: 'a'
+    },
+    qk: {
+        title: '\\(\\rho\\)-weighted Q·K Scores',
+        text: 'Attention queries Q and keys K are each scaled by √ρ before the dot product. This is equivalent to computing attention in a ρ-weighted inner-product space: high-agreement dimensions contribute more to the similarity score.',
+        dims: 'Q, K ∈ ℝⁿˣ⁶⁴ per head',
+        hl: 'b'
+    },
+    sqrt_dh: {
+        title: 'Head Dimension Scale  \\(\\sqrt{d_h}\\)',
+        text: 'Standard scaled dot-product attention normalization (d_h = 64). Prevents attention logits from growing too large as the head dimension increases.',
+        dims: 'd_h = 64 (8 heads × 64 = 512)',
+        hl: 'c'
+    },
+    values: {
+        title: 'Value Vectors  \\(\\mathbf{V}\\)',
+        text: 'Unmodified value projections of the patch features. In this variant, ρ modulates only which patches get attended to (Q/K), not the information that flows through (V).',
+        dims: 'V ∈ ℝⁿˣ⁶⁴ per head',
+        hl: 'e'
+    },
+    values_mod: {
+        title: 'Modulated Values  \\(\\mathbf{V} \\odot \\sqrt{\\boldsymbol{\\rho}}\\)',
+        text: 'Both the attention weighting (Q/K) and the content (V) are modulated by the global agreement signal, ensuring only consistent features flow to the final representation.',
+        dims: 'V ∈ ℝⁿˣ⁶⁴ — agreement scaled',
+        hl: 'e'
+    }
+};
+
+const vHlColors = {
+    a: '#818cf8', b: '#34d399', c: '#fb923c', d: '#f472b6', e: '#2dd4bf'
+};
+
+let activeVTip = null;
+
+function toggleVCard(id) {
+    document.getElementById(id).classList.toggle('open');
+}
+
+function showVTip(el) {
+    const cardId = el.getAttribute('data-card');
+    const key = el.getAttribute('data-key');
+    const info = variantDB[key];
+    if (!info) return;
+
+    const card = document.getElementById(cardId);
+    card.querySelectorAll('.v-eq-part').forEach(p => p.classList.remove('selected'));
+    el.classList.add('selected');
+
+    const tip = document.getElementById(cardId + '-tip');
+    const dotColor = vHlColors[info.hl] || '#999';
+
+    tip.innerHTML = `
+        <button class="v-tip-close" onclick="hideVTip('${cardId}')">&times;</button>
+        <div class="vt-title">
+            <span class="vt-dot" style="background:${dotColor}"></span>
+            ${info.title}
+        </div>
+        <div class="vt-text">${info.text}</div>
+        <div class="vt-dims">${info.dims}</div>
+    `;
+
+    tip.classList.add('visible');
+    activeVTip = cardId;
+
+    if (window.MathJax && MathJax.typesetPromise) {
+        MathJax.typesetPromise([tip]).catch(() => {});
+    }
+}
+
+function hideVTip(cardId) {
+    const tip = document.getElementById(cardId + '-tip');
+    tip.classList.remove('visible');
+    const card = document.getElementById(cardId);
+    card.querySelectorAll('.v-eq-part').forEach(p => p.classList.remove('selected'));
+    activeVTip = null;
+}
+
+function clickVLabel(el, cardId, key) {
+    const card = document.getElementById(cardId);
+    if (!card.classList.contains('open')) card.classList.add('open');
+    const part = card.querySelector(`.v-eq-part[data-key="${key}"]`);
+    if (part) showVTip(part);
+}
+
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.v-eq-part') && !e.target.closest('.v-tip') && !e.target.closest('.v-eq-arrow-label')) {
+        if (activeVTip) hideVTip(activeVTip);
+    }
+});
